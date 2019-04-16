@@ -4,7 +4,9 @@ data Pirata = UnPirata{
     deriving (Show,Eq)
 
 
-type Barco = [Pirata]
+type Barco = ([Pirata],FormaSaqueo)
+
+type FormaSaqueo = ([Tesoro] -> [Tesoro])
 
 type Isla = (String,Tesoro)
 
@@ -27,18 +29,18 @@ type Tesoro = (String, Int)
 mapa = ("Mapa",10)
 brujula = ("Brujula",10000)
 cajitalMusical = ("Cajita Musical",1)
-doblones = ("Doblones",100)
+doblones = ("Doblones",10000)
 monedaCofreMuerto = ("Moneda Cofre Muerto", 100)
 espadaHierro = ("Espada de Hierro", 50)
 cuchillo = ("Cuchillo", 5)
-botellaRon :: ([Char], Int)
+botellaRon :: Tesoro
 botellaRon = ("Botella de Ron",25)
 oro = ("Oro",100)
 
 --BARCOS
 
-perlaNegra = [jackSparrow,anneBonny]
-holandesErrante = [davidJones]
+perlaNegra = ([jackSparrow,anneBonny],saquearValiosos)
+holandesErrante = ([davidJones],saquearConCorazon)
 
 --ISLAS
 
@@ -60,9 +62,14 @@ cantTesoros unPirata = length (botin unPirata)
 esAfortunado :: Pirata -> Bool
 esAfortunado unPirata = sum (map snd (botin unPirata)) > 10000
 
+esMismoTesoroConValorDistinto :: Tesoro -> Tesoro -> Bool 
+esMismoTesoroConValorDistinto unTesoro otroTesoro = (fst unTesoro == fst otroTesoro) && (snd unTesoro /= snd otroTesoro)
 
-tienenElMismoTesoro unPirata otroPirata = zipWith (==) (botin unPirata) (botin otroPirata)
--- tienenElMismoTesoro unPirata otroPirata = zipWith (==) 	(map fst (botin unPirata)) (map fst (botin otroPirata))
+loTieneOtroPirataConDistintoValor :: Pirata -> Tesoro -> Bool
+loTieneOtroPirataConDistintoValor unPirata unTesoro = any (esMismoTesoroConValorDistinto unTesoro) (botin unPirata)
+
+tienenElMismoTesoroConValorDiferente :: Pirata -> Pirata -> Bool
+tienenElMismoTesoroConValorDiferente  unPirata otroPirata = any (loTieneOtroPirataConDistintoValor otroPirata) (botin unPirata)
 
 valorTesoroMasValioso :: Pirata -> Int
 valorTesoroMasValioso unPirata = maximum (map snd (botin unPirata))
@@ -106,8 +113,8 @@ saquearConjuncion unObjeto unTesoro
 -- USANDO COMPOSICION?? (saquearConCorazon.saquearValiosos) unTesoro
 -- VER QUE PASA SI NO LE PASO EL PARAMETRO unObjeto
 
-saquear :: Pirata -> (t -> [Tesoro]) -> t -> [Tesoro]
-saquear unPirata formaSaqueo unTesoro = (formaSaqueo unTesoro) ++ (botin unPirata)
+saquear :: (t -> [Tesoro]) -> Pirata -> t -> [Tesoro]
+saquear formaSaqueo unPirata unTesoro = (formaSaqueo unTesoro) ++ (botin unPirata)
 
 --EJEMPLO (le pasamos el parametro que le falta)
 -- *Main> saquear jackSparrow (saquearObjetoEspecifico doblones) [mapa,brujula,doblones]
@@ -132,24 +139,23 @@ saquear unPirata formaSaqueo unTesoro = (formaSaqueo unTesoro) ++ (botin unPirat
 
 --BARCOS
 
-seIncorpora:: Pirata -> Barco -> Barco
-seIncorpora unPirata unBarco = unPirata : unBarco
+seIncorpora :: Pirata -> Barco -> [Pirata]
+seIncorpora unPirata unBarco = unPirata :  (fst unBarco)
 
-seVa :: Pirata -> Barco -> Barco
-seVa unPirata unBarco = filter ((/=)unPirata) unBarco
+seVa :: Pirata -> Barco -> [Pirata]
+seVa unPirata unBarco = filter ((/=)unPirata) (fst unBarco)
 
 anclarIslaDesabitada :: Isla -> Barco -> [[Tesoro]]
-anclarIslaDesabitada unaIsla unBarco = map ((:) (snd unaIsla)) (map botin unBarco)
+anclarIslaDesabitada unaIsla unBarco = map ((:) (snd unaIsla)) (map botin (fst unBarco))
+
 
 haySufiTesoros :: Ciudad -> Barco -> Bool
-haySufiTesoros unaCiudad unBarco = length (snd unaCiudad) >= length unBarco
+haySufiTesoros unaCiudad unBarco = length (snd unaCiudad) >= length (fst unBarco)
 
+atacarUnaCiudad :: Ciudad -> Barco -> FormaSaqueo -> [[Tesoro]]
+atacarUnaCiudad unaCiudad unBarco formaSaqueo = zipWith (saquear formaSaqueo) (fst unBarco) [(snd unaCiudad)]
 
--- mismaFormaSaqueo unPirata unBarco = (formaSaqueo unPirata) == (formaSaqueo unBarco)
-
-
---atacarUnaCiudad unaCiudad unBarco formaSaqueo 
---  | haySufiTesoros unaCiudad unBarco = zipWith (formaSaqueo) (unaCiudad) (map botin unBarco)
--- | otherwise = unBarco
-
-abordar unBarco otroBarco = (map botin unBarco) ++ (map (pierdeTodosSusTesorosValiosos) otroBarco)
+abordarOtroBarco :: Barco -> Barco -> [[Tesoro]]
+abordarOtroBarco unBarco otroBarco
+ | (length (fst unBarco)) >= (length (fst otroBarco)) = map (pierdeTodosSusTesorosValiosos) (fst otroBarco)
+ | otherwise = map (pierdeTodosSusTesorosValiosos) (fst unBarco)
