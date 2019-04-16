@@ -1,3 +1,5 @@
+import Text.Show.Functions
+
 data Pirata = UnPirata{
     nombre :: String,
     botin :: [Tesoro]}
@@ -6,7 +8,7 @@ data Pirata = UnPirata{
 
 type Barco = ([Pirata],FormaSaqueo)
 
-type FormaSaqueo = ([Tesoro] -> [Tesoro])
+type FormaSaqueo = (Tesoro -> Bool)
 
 type Isla = (String,Tesoro)
 
@@ -15,7 +17,7 @@ type Ciudad = (String,[Tesoro])
 
 --PIRATAS
 
-jackSparrow = UnPirata "Jack Sparrow" [brujula,("Frasco De Arena",0),mapa,("Frasco De Arena",1),oro]
+jackSparrow = UnPirata "Jack Sparrow" [brujula,("Frasco De Arena",0)]
 davidJones = UnPirata "David Jones" [cajitalMusical]
 anneBonny = UnPirata "Anne Bonny" [doblones,("Frasco De Arena",1)]
 elizabethSwann = UnPirata "Elizabeth Swann" [monedaCofreMuerto,espadaHierro]
@@ -26,30 +28,42 @@ willTurner = UnPirata "Will Turner" [cuchillo]
 
 type Tesoro = (String, Int)
 
-mapa = ("Mapa",10)
+brujula :: Tesoro
 brujula = ("Brujula",10000)
+cajitalMusical :: Tesoro
 cajitalMusical = ("Cajita Musical",1)
-doblones = ("Doblones",10000)
+doblones :: Tesoro
+doblones = ("Doblones",100)
 monedaCofreMuerto = ("Moneda Cofre Muerto", 100)
+espadaHierro :: Tesoro
 espadaHierro = ("Espada de Hierro", 50)
+cuchillo :: Tesoro
 cuchillo = ("Cuchillo", 5)
+mapa :: Tesoro
+mapa = ("Mapa",10)
 botellaRon :: Tesoro
 botellaRon = ("Botella de Ron",25)
+oro :: Tesoro
 oro = ("Oro",100)
+sombrero :: Tesoro
+sombrero = ("Sombrero",23)
+frasco :: Tesoro
+frasco = ("Frasco De Arena",1)
 
 --BARCOS
 
-perlaNegra = ([jackSparrow,anneBonny],saquearValiosos)
+perlaNegra = ([jackSparrow,anneBonny],saquearValioso)
 holandesErrante = ([davidJones],saquearConCorazon)
 
 --ISLAS
 
-islaTortuga = ("Isla Tortuga", ("Frasco De Arena",1))
+islaTortuga = ("Isla Tortuga", frasco)
 islaRon = ("Isla del Ron", botellaRon)
 
 
 -- CIUDADES
 portRoyal = ("Port Royal", [brujula,doblones,cajitalMusical,monedaCofreMuerto])
+carmenPatagones = ("Carmen de Patagones", [mapa])
 
 
 ---------------------------------------------------------------------------------------------------------------------
@@ -95,46 +109,36 @@ pierdeUnTesoro unPirata nombreTesoro = filter ((/=)nombreTesoro) (map fst (botin
 
 --TIPOS DE SAQUEOS
 
-saquearValiosos :: [Tesoro] -> [Tesoro]
-saquearValiosos unTesoro = filter esValioso unTesoro
+saquearValioso :: Tesoro -> Bool
+saquearValioso unTesoro = esValioso unTesoro
 
-saquearObjetoEspecifico :: Tesoro -> [Tesoro] -> [Tesoro]
-saquearObjetoEspecifico unObjeto unTesoro = filter ((==)unObjeto) unTesoro
+saquearObjetoEspecifico :: Tesoro -> Tesoro -> Bool
+saquearObjetoEspecifico unObjeto unTesoro = unObjeto == unTesoro
 
-saquearConCorazon :: [Tesoro] -> [Tesoro]
-saquearConCorazon unTesoro = []
+saquearConCorazon :: Tesoro -> Bool
+saquearConCorazon unTesoro = False
 
-saquearConjuncion :: Tesoro -> [Tesoro] -> [Tesoro]
-saquearConjuncion unObjeto unTesoro
-  | any esValioso unTesoro  = saquearValiosos unTesoro
-  | elem unObjeto unTesoro = saquearObjetoEspecifico unObjeto unTesoro
-  | otherwise = saquearConCorazon unTesoro
-
--- USANDO COMPOSICION?? (saquearConCorazon.saquearValiosos) unTesoro
--- VER QUE PASA SI NO LE PASO EL PARAMETRO unObjeto
-
-saquear :: (t -> [Tesoro]) -> Pirata -> t -> [Tesoro]
-saquear formaSaqueo unPirata unTesoro = (formaSaqueo unTesoro) ++ (botin unPirata)
-
---EJEMPLO (le pasamos el parametro que le falta)
--- *Main> saquear jackSparrow (saquearObjetoEspecifico doblones) [mapa,brujula,doblones]
--- [("Doblones",100),("Brujula",10000),("Frasco De Arena",0),("mapa",10),("Frasco De Arena",1)]
+saquearConjuncion :: Tesoro -> Tesoro -> Bool
+saquearConjuncion unObjeto unTesoro = saquearValioso unTesoro || saquearObjetoEspecifico unObjeto unTesoro
 
 
+saquear :: FormaSaqueo -> Pirata -> Tesoro -> [Tesoro]
+saquear formaSaqueo unPirata unTesoro = (botin unPirata) ++ filter formaSaqueo [unTesoro]
 
 -- PRUEBAS
 
--- *Main> saquear anneBonny (saquearObjetoEspecifico oro) [oro]
--- [("Oro",100),("Doblones",100),("Frasco De Arena",1)]
+-- *Main> saquear (saquearObjetoEspecifico oro) anneBonny oro
+-- [("Doblones",10000),("Frasco De Arena",1),("Oro",100)]
 
--- *Main> saquear davidJones saquearConCorazon [brujula,oro,mapa,doblones]
+-- *Main> saquear saquearConCorazon davidJones oro
 -- [("Cajita Musical",1)]
 
+-- *Main> saquear (saquearConjuncion sombrero) jackSparrow oro
+-- [("Brujula",10000),("Frasco De Arena",0)]
 
 
 ---------------------------------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------------------------
-
 
 
 --BARCOS
@@ -148,14 +152,35 @@ seVa unPirata unBarco = filter ((/=)unPirata) (fst unBarco)
 anclarIslaDesabitada :: Isla -> Barco -> [[Tesoro]]
 anclarIslaDesabitada unaIsla unBarco = map ((:) (snd unaIsla)) (map botin (fst unBarco))
 
-
-haySufiTesoros :: Ciudad -> Barco -> Bool
-haySufiTesoros unaCiudad unBarco = length (snd unaCiudad) >= length (fst unBarco)
-
 atacarUnaCiudad :: Ciudad -> Barco -> FormaSaqueo -> [[Tesoro]]
-atacarUnaCiudad unaCiudad unBarco formaSaqueo = zipWith (saquear formaSaqueo) (fst unBarco) [(snd unaCiudad)]
+atacarUnaCiudad unaCiudad unBarco formaSaqueo = zipWith (saquear formaSaqueo) (fst unBarco) (snd unaCiudad)
 
 abordarOtroBarco :: Barco -> Barco -> [[Tesoro]]
 abordarOtroBarco unBarco otroBarco
  | (length (fst unBarco)) >= (length (fst otroBarco)) = map (pierdeTodosSusTesorosValiosos) (fst otroBarco)
  | otherwise = map (pierdeTodosSusTesorosValiosos) (fst unBarco)
+
+
+---------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------------------
+
+
+--TODA LA PELICULA
+{-
+
+*Main> anclarIslaDesabitada islaRon perlaNegra
+[[("Botella de Ron",25),("Brujula",10000),("Frasco De Arena",0)],[("Botella de Ron",25),("Doblones",100),("Frasco De Arena",1)]]
+
+*Main> atacarUnaCiudad portRoyal perlaNegra saquearValioso
+[[("Brujula",10000),("Frasco De Arena",0),("Brujula",10000)],[("Doblones",100),("Frasco De Arena",1)]]
+
+*Main> anclarIslaDesabitada islaTortuga holandesErrante
+[[("Frasco De Arena",1),("Cajita Musical",1)]]
+
+*Main> atacarUnaCiudad carmenPatagones holandesErrante saquearValioso
+[[("Cajita Musical",1)]]
+
+*Main> abordarOtroBarco perlaNegra holandesErrante
+[[("Cajita Musical",1)]]
+
+-}
